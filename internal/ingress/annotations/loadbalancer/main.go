@@ -37,6 +37,7 @@ type PortData struct {
 }
 
 type Config struct {
+	AlbArn         *string
 	Scheme         *string
 	IPAddressType  *string
 	WebACLId       *string
@@ -66,6 +67,9 @@ func NewParser(r resolver.Resolver) parser.IngressAnnotation {
 
 // Parse parses the annotations contained in the resource
 func (lb loadBalancer) Parse(ing parser.AnnotationInterface) (interface{}, error) {
+	//TODO: handle error
+	arn, _ := parser.GetStringAnnotation("alb-arn", ing)
+
 	ipAddressType, err := parser.GetStringAnnotation("ip-address-type", ing)
 	if err != nil {
 		ipAddressType = aws.String(DefaultIPAddressType)
@@ -108,6 +112,7 @@ func (lb loadBalancer) Parse(ing parser.AnnotationInterface) (interface{}, error
 	}
 
 	return &Config{
+		AlbArn:        arn,
 		Scheme:        scheme,
 		IPAddressType: ipAddressType,
 

@@ -72,6 +72,8 @@ type loadBalancerConfig struct {
 	Scheme        *string
 	IpAddressType *string
 	Subnets       []string
+
+	AlbArn *string
 }
 
 type defaultController struct {
@@ -184,6 +186,17 @@ func (controller *defaultController) Delete(ctx context.Context, ingressKey type
 }
 
 func (controller *defaultController) ensureLBInstance(ctx context.Context, lbConfig *loadBalancerConfig, sgAttachment sg.LbAttachmentInfo) (*elbv2.LoadBalancer, error) {
+	if lbConfig.AlbArn != nil {
+		var err error
+		albArn := aws.StringValue(lbConfig.AlbArn)
+		instance, err := controller.cloud.GetLoadBalancerByArn(ctx, albArn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find existing LoadBalancer %s due to %v", albArn, err)
+		}
+
+		return instance, nil
+	}
+
 	instance, err := controller.cloud.GetLoadBalancerByName(ctx, lbConfig.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find existing LoadBalancer due to %v", err)
@@ -300,6 +313,7 @@ func (controller *defaultController) buildLBConfig(ctx context.Context, ingress 
 		Scheme:        ingressAnnos.LoadBalancer.Scheme,
 		IpAddressType: ingressAnnos.LoadBalancer.IPAddressType,
 		Subnets:       subnets,
+		Arn:           ingressAnnos.LoadBalancer.Arn,
 	}, nil
 }
 
