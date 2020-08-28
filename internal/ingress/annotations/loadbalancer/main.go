@@ -37,7 +37,6 @@ type PortData struct {
 }
 
 type Config struct {
-	AlbArn         *string
 	Scheme         *string
 	IPAddressType  *string
 	WebACLId       *string
@@ -49,6 +48,8 @@ type Config struct {
 	SecurityGroups []string
 	Subnets        []string
 	Attributes     []*elbv2.LoadBalancerAttribute
+	AlbArn         *string
+	AlbName        *string
 }
 
 type loadBalancer struct {
@@ -68,7 +69,8 @@ func NewParser(r resolver.Resolver) parser.IngressAnnotation {
 // Parse parses the annotations contained in the resource
 func (lb loadBalancer) Parse(ing parser.AnnotationInterface) (interface{}, error) {
 	//TODO: handle error
-	arn, _ := parser.GetStringAnnotation("alb-arn", ing)
+	albArn, _ := parser.GetStringAnnotation("alb-arn", ing)
+	albName, _ := parser.GetStringAnnotation("alb-name", ing)
 
 	ipAddressType, err := parser.GetStringAnnotation("ip-address-type", ing)
 	if err != nil {
@@ -112,7 +114,6 @@ func (lb loadBalancer) Parse(ing parser.AnnotationInterface) (interface{}, error
 	}
 
 	return &Config{
-		AlbArn:        arn,
 		Scheme:        scheme,
 		IPAddressType: ipAddressType,
 
@@ -124,6 +125,9 @@ func (lb loadBalancer) Parse(ing parser.AnnotationInterface) (interface{}, error
 
 		Subnets:        subnets,
 		SecurityGroups: securityGroups,
+
+		AlbArn:  albArn,
+		AlbName: albName,
 	}, nil
 }
 

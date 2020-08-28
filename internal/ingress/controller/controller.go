@@ -8,8 +8,6 @@ import (
 
 	"github.com/kubernetes-sigs/aws-alb-ingress-controller/internal/alb/generator"
 	"github.com/kubernetes-sigs/aws-alb-ingress-controller/internal/alb/lb"
-	"github.com/kubernetes-sigs/aws-alb-ingress-controller/internal/alb/ls"
-	"github.com/kubernetes-sigs/aws-alb-ingress-controller/internal/alb/sg"
 	"github.com/kubernetes-sigs/aws-alb-ingress-controller/internal/alb/tags"
 	"github.com/kubernetes-sigs/aws-alb-ingress-controller/internal/alb/tg"
 	"github.com/kubernetes-sigs/aws-alb-ingress-controller/internal/aws"
@@ -63,10 +61,13 @@ func newReconciler(config *config.Configuration, mgr manager.Manager, mc metric.
 	tagsController := tags.NewController(cloud)
 	endpointResolver := backend.NewEndpointResolver(store, cloud)
 	tgGroupController := tg.NewGroupController(cloud, store, nameTagGenerator, tagsController, endpointResolver, client)
-	lsGroupController := ls.NewGroupController(store, cloud, authModule)
-	sgAssociationController := sg.NewAssociationController(store, cloud, tagsController, nameTagGenerator)
+	//lsGroupController := ls.NewGroupController(store, cloud, authModule)
+	//sgAssociationController := sg.NewAssociationController(store, cloud, tagsController, nameTagGenerator)
+
+	//lbController := lb.NewController(cloud, store,
+	//	nameTagGenerator, tgGroupController, lsGroupController, sgAssociationController, tagsController)
 	lbController := lb.NewController(cloud, store,
-		nameTagGenerator, tgGroupController, lsGroupController, sgAssociationController, tagsController)
+		nameTagGenerator, tgGroupController, tagsController)
 
 	return &Reconciler{
 		client:          client,

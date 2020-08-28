@@ -6,8 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/kubernetes-sigs/aws-alb-ingress-controller/internal/ingress/controller/config"
-
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/kubernetes-sigs/aws-alb-ingress-controller/internal/alb/ls"
@@ -41,8 +39,6 @@ func NewController(
 	store store.Storer,
 	nameTagGen NameTagGenerator,
 	tgGroupController tg.GroupController,
-	lsGroupController ls.GroupController,
-	sgAssociationController sg.AssociationController,
 	tagsController tags.Controller) Controller {
 	attrsController := NewAttributesController(cloud)
 	wafController := NewWAFController(cloud)
@@ -50,17 +46,15 @@ func NewController(
 	shieldController := NewShieldController(cloud)
 
 	return &defaultController{
-		cloud:                   cloud,
-		store:                   store,
-		nameTagGen:              nameTagGen,
-		tgGroupController:       tgGroupController,
-		lsGroupController:       lsGroupController,
-		sgAssociationController: sgAssociationController,
-		tagsController:          tagsController,
-		attrsController:         attrsController,
-		wafController:           wafController,
-		wafV2Controller:         wafV2Controller,
-		shieldController:        shieldController,
+		cloud:             cloud,
+		store:             store,
+		nameTagGen:        nameTagGen,
+		tgGroupController: tgGroupController,
+		tagsController:    tagsController,
+		attrsController:   attrsController,
+		wafController:     wafController,
+		wafV2Controller:   wafV2Controller,
+		shieldController:  shieldController,
 	}
 }
 
@@ -73,7 +67,8 @@ type loadBalancerConfig struct {
 	IpAddressType *string
 	Subnets       []string
 
-	AlbArn *string
+	AlbArn  *string
+	AlbName *string
 }
 
 type defaultController struct {
@@ -107,12 +102,13 @@ func (controller *defaultController) Reconcile(ctx context.Context, ingress *ext
 		return nil, err
 	}
 
-	ingKey := k8s.NamespacedName(ingress)
-	sgAttachment, err := controller.sgAssociationController.Setup(ctx, ingKey)
-	if err != nil {
-		return nil, err
-	}
-	instance, err := controller.ensureLBInstance(ctx, lbConfig, sgAttachment)
+	//ingKey := k8s.NamespacedName(ingress)
+	//sgAttachment, err := controller.sgAssociationController.Setup(ctx, ingKey)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//instance, err := controller.ensureLBInstance(ctx, lbConfig, sgAttachment)
+	instance, err := controller.ensureLBInstance(ctx, lbConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -121,38 +117,38 @@ func (controller *defaultController) Reconcile(ctx context.Context, ingress *ext
 		return nil, fmt.Errorf("failed to reconcile attributes of %v due to %v", lbArn, err)
 	}
 
-	if controller.store.GetConfig().FeatureGate.Enabled(config.WAF) {
-		if err := controller.wafController.Reconcile(ctx, lbArn, ingress); err != nil {
-			return nil, err
-		}
-	}
+	//if controller.store.GetConfig().FeatureGate.Enabled(config.WAF) {
+	//	if err := controller.wafController.Reconcile(ctx, lbArn, ingress); err != nil {
+	//		return nil, err
+	//	}
+	//}
 
-	if controller.store.GetConfig().FeatureGate.Enabled(config.WAFV2) {
-		if err := controller.wafV2Controller.Reconcile(ctx, lbArn, ingress); err != nil {
-			return nil, err
-		}
-	}
+	//if controller.store.GetConfig().FeatureGate.Enabled(config.WAFV2) {
+	//	if err := controller.wafV2Controller.Reconcile(ctx, lbArn, ingress); err != nil {
+	//		return nil, err
+	//	}
+	//}
 
-	if controller.store.GetConfig().FeatureGate.Enabled(config.ShieldAdvanced) {
-		if err := controller.shieldController.Reconcile(ctx, lbArn, ingress); err != nil {
-			return nil, err
-		}
-	}
+	//if controller.store.GetConfig().FeatureGate.Enabled(config.ShieldAdvanced) {
+	//	if err := controller.shieldController.Reconcile(ctx, lbArn, ingress); err != nil {
+	//		return nil, err
+	//	}
+	//}
 
 	tgGroup, err := controller.tgGroupController.Reconcile(ctx, ingress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to reconcile targetGroups due to %v", err)
 	}
-	if err := controller.lsGroupController.Reconcile(ctx, lbArn, ingress, tgGroup); err != nil {
-		return nil, fmt.Errorf("failed to reconcile listeners due to %v", err)
-	}
+	//if err := controller.lsGroupController.Reconcile(ctx, lbArn, ingress, tgGroup); err != nil {
+	//	return nil, fmt.Errorf("failed to reconcile listeners due to %v", err)
+	//}
 	if err := controller.tgGroupController.GC(ctx, tgGroup); err != nil {
 		return nil, fmt.Errorf("failed to GC targetGroups due to %v", err)
 	}
 
-	if err := controller.sgAssociationController.Reconcile(ctx, ingKey, sgAttachment, instance, tgGroup); err != nil {
-		return nil, fmt.Errorf("failed to reconcile securityGroup associations due to %v", err)
-	}
+	//if err := controller.sgAssociationController.Reconcile(ctx, ingKey, sgAttachment, instance, tgGroup); err != nil {
+	//	return nil, fmt.Errorf("failed to reconcile securityGroup associations due to %v", err)
+	//}
 	return &LoadBalancer{
 		Arn:     lbArn,
 		DNSName: aws.StringValue(instance.DNSName),
@@ -166,9 +162,9 @@ func (controller *defaultController) Delete(ctx context.Context, ingressKey type
 		return fmt.Errorf("failed to find existing LoadBalancer due to %v", err)
 	}
 	if instance != nil {
-		if err = controller.lsGroupController.Delete(ctx, aws.StringValue(instance.LoadBalancerArn)); err != nil {
-			return fmt.Errorf("failed to delete listeners due to %v", err)
-		}
+		//if err = controller.lsGroupController.Delete(ctx, aws.StringValue(instance.LoadBalancerArn)); err != nil {
+		//	return fmt.Errorf("failed to delete listeners due to %v", err)
+		//}
 		if err = controller.tgGroupController.Delete(ctx, ingressKey); err != nil {
 			return fmt.Errorf("failed to GC targetGroups due to %v", err)
 		}
@@ -178,15 +174,16 @@ func (controller *defaultController) Delete(ctx context.Context, ingressKey type
 			return err
 		}
 	}
-	if err = controller.sgAssociationController.Delete(ctx, ingressKey); err != nil {
-		return fmt.Errorf("failed to clean up securityGroups due to %v", err)
-	}
+	//if err = controller.sgAssociationController.Delete(ctx, ingressKey); err != nil {
+	//	return fmt.Errorf("failed to clean up securityGroups due to %v", err)
+	//}
 
 	return nil
 }
 
-func (controller *defaultController) ensureLBInstance(ctx context.Context, lbConfig *loadBalancerConfig, sgAttachment sg.LbAttachmentInfo) (*elbv2.LoadBalancer, error) {
-	if lbConfig.AlbArn != nil {
+//func (controller *defaultController) ensureLBInstance(ctx context.Context, lbConfig *loadBalancerConfig, sgAttachment sg.LbAttachmentInfo) (*elbv2.LoadBalancer, error) {
+func (controller *defaultController) ensureLBInstance(ctx context.Context, lbConfig *loadBalancerConfig) (*elbv2.LoadBalancer, error) {
+	if lbConfig.AlbArn != nil && lbConfig.AlbName != nil {
 		var err error
 		albArn := aws.StringValue(lbConfig.AlbArn)
 		instance, err := controller.cloud.GetLoadBalancerByArn(ctx, albArn)
@@ -201,20 +198,20 @@ func (controller *defaultController) ensureLBInstance(ctx context.Context, lbCon
 	if err != nil {
 		return nil, fmt.Errorf("failed to find existing LoadBalancer due to %v", err)
 	}
-	if instance == nil {
-		instance, err = controller.newLBInstance(ctx, lbConfig, sgAttachment)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create LoadBalancer due to %v", err)
-		}
-		return instance, nil
-	}
-	if controller.isLBInstanceNeedRecreation(ctx, instance, lbConfig) {
-		instance, err = controller.recreateLBInstance(ctx, instance, lbConfig, sgAttachment)
-		if err != nil {
-			return nil, fmt.Errorf("failed to recreate LoadBalancer due to %v", err)
-		}
-		return instance, nil
-	}
+	//if instance == nil {
+	//	instance, err = controller.newLBInstance(ctx, lbConfig, sgAttachment)
+	//	if err != nil {
+	//		return nil, fmt.Errorf("failed to create LoadBalancer due to %v", err)
+	//	}
+	//	return instance, nil
+	//}
+	//if controller.isLBInstanceNeedRecreation(ctx, instance, lbConfig) {
+	//	instance, err = controller.recreateLBInstance(ctx, instance, lbConfig, sgAttachment)
+	//	if err != nil {
+	//		return nil, fmt.Errorf("failed to recreate LoadBalancer due to %v", err)
+	//	}
+	//	return instance, nil
+	//}
 	if err := controller.reconcileLBInstance(ctx, instance, lbConfig); err != nil {
 		return nil, err
 	}
@@ -305,15 +302,22 @@ func (controller *defaultController) buildLBConfig(ctx context.Context, ingress 
 		return nil, err
 	}
 
+	var name string
+	if albName := ingressAnnos.LoadBalancer.AlbName; albName != nil {
+		name = aws.StringValue(albName)
+	} else {
+		name = controller.nameTagGen.NameLB(ingress.Namespace, ingress.Name)
+	}
+
 	return &loadBalancerConfig{
-		Name: controller.nameTagGen.NameLB(ingress.Namespace, ingress.Name),
+		Name: name,
 		Tags: lbTags,
 
 		Type:          aws.String(elbv2.LoadBalancerTypeEnumApplication),
 		Scheme:        ingressAnnos.LoadBalancer.Scheme,
 		IpAddressType: ingressAnnos.LoadBalancer.IPAddressType,
 		Subnets:       subnets,
-		Arn:           ingressAnnos.LoadBalancer.Arn,
+		AlbArn:        ingressAnnos.LoadBalancer.AlbArn,
 	}, nil
 }
 
